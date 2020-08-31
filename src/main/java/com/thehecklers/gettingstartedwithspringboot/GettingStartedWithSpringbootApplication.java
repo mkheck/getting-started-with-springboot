@@ -1,14 +1,18 @@
 package com.thehecklers.gettingstartedwithspringboot;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+
+import javax.annotation.PostConstruct;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 
 @SpringBootApplication
 public class GettingStartedWithSpringbootApplication {
@@ -30,67 +37,72 @@ public class GettingStartedWithSpringbootApplication {
 
 }
 
+@AllArgsConstructor
+@Component
+class DataLoader {
+	private final CoffeeRepository repo;
+
+	@PostConstruct
+	public void loadData() {
+		repo.saveAll(
+			List.of(
+				new Coffee("Cafe Ganador"), 
+				new Coffee("Cafe Cereza"), 
+				new Coffee("Cafe Lareno"),
+				new Coffee("Cafe Tres Pontas"))
+		);
+	}
+}
+
+@AllArgsConstructor
 @RestController
 @RequestMapping("/coffees")
 class CoffeeController {
-	private List<Coffee> coffees = new ArrayList<>();
-
-	public CoffeeController() {
-		coffees.addAll(
-			List.of(new Coffee("Cafe Ganador"),
-					new Coffee("Cafe Cereza"),
-					new Coffee("Cafe Lareno"),
-					new Coffee("Cafe Tres Pontas"))
-			);
-	}
+	private final CoffeeRepository repo;
 
 	@GetMapping
 	Iterable<Coffee> getAllCoffees() {
-		return coffees;
+		return repo.findAll();
 	}
 
 	@GetMapping("/{id}")
 	Optional<Coffee> getCoffeeById(String id) {
-		for (final Coffee coffee : coffees) {
-			if (coffee.getId().equals(id)) {
-				return Optional.of(coffee);
-			}
-		}
-
-		return Optional.empty();
+		return repo.findById(id);
 	}
 
 	@PostMapping
 	Coffee postCoffee(@RequestBody Coffee coffee) {
-		coffees.add(coffee);
-		return coffee;
+		return repo.save(coffee);
 	}
 
 	@PutMapping("/{id}")
 	ResponseEntity<?> putCoffee(@PathVariable String id, @RequestBody Coffee coffee) {
-		for (final Coffee c : coffees) {
-			if (c.getId().equals(id)) {
-				coffees.set(coffees.indexOf(c), coffee);
-				return new ResponseEntity<>(coffee, HttpStatus.OK);
-			}
-		}
-
-		return new ResponseEntity<>(postCoffee(coffee), HttpStatus.CREATED);
+		return (repo.existsById(id))
+			? new ResponseEntity<>(repo.save(coffee), HttpStatus.OK)
+			: new ResponseEntity<>(repo.save(coffee), HttpStatus.CREATED);
 	}
 
 	@DeleteMapping("/{id}")
 	void deleteCoffeeById(@PathVariable String id) {
-		coffees.removeIf(c -> c.getId().equals(id));
+		repo.deleteById(id);
 	}
 }
 
+interface CoffeeRepository extends CrudRepository<Coffee, String> {
+}
+
+@Document
 @Data
-@AllArgsConstructor
+@NoArgsConstructor
+@RequiredArgsConstructor
+// @AllArgsConstructor
 class Coffee {
+	@Id
 	private String id;
+	@NonNull
 	private String name;
 
-	public Coffee(String name) {
-		this(UUID.randomUUID().toString(), name);
-	}
+	// public Coffee(String name) {
+	// this(UUID.randomUUID().toString(), name);
+	// }
 }
