@@ -1,15 +1,12 @@
 package com.thehecklers.gettingstartedwithspringboot;
 
-import java.util.List;
-import java.util.Optional;
-
 import javax.annotation.PostConstruct;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -27,6 +24,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @SpringBootApplication
 public class GettingStartedWithSpringbootApplication {
@@ -45,12 +44,13 @@ class DataLoader {
 	@PostConstruct
 	public void loadData() {
 		repo.saveAll(
-			List.of(
+			Flux.just(
 				new Coffee("Cafe Ganador"), 
 				new Coffee("Cafe Cereza"), 
 				new Coffee("Cafe Lareno"),
 				new Coffee("Cafe Tres Pontas"))
-		);
+		)
+		.subscribe();
 	}
 }
 
@@ -61,34 +61,36 @@ class CoffeeController {
 	private final CoffeeRepository repo;
 
 	@GetMapping
-	Iterable<Coffee> getAllCoffees() {
+	Flux<Coffee> getAllCoffees() {
 		return repo.findAll();
 	}
 
 	@GetMapping("/{id}")
-	Optional<Coffee> getCoffeeById(String id) {
+	Mono<Coffee> getCoffeeById(String id) {
 		return repo.findById(id);
 	}
 
 	@PostMapping
-	Coffee postCoffee(@RequestBody Coffee coffee) {
+	Mono<Coffee> postCoffee(@RequestBody Coffee coffee) {
 		return repo.save(coffee);
 	}
 
 	@PutMapping("/{id}")
-	ResponseEntity<?> putCoffee(@PathVariable String id, @RequestBody Coffee coffee) {
-		return (repo.existsById(id))
-			? new ResponseEntity<>(repo.save(coffee), HttpStatus.OK)
-			: new ResponseEntity<>(repo.save(coffee), HttpStatus.CREATED);
+	Mono<ResponseEntity<?>> putCoffee(@PathVariable String id, @RequestBody Coffee coffee) {
+		return repo.existsById(id)
+			.map(exists -> exists
+				? ResponseEntity.status(HttpStatus.OK).body(repo.save(coffee))
+				: ResponseEntity.status(HttpStatus.CREATED).body(repo.save(coffee))
+			);
 	}
 
 	@DeleteMapping("/{id}")
-	void deleteCoffeeById(@PathVariable String id) {
-		repo.deleteById(id);
+	Mono<Void> deleteCoffeeById(@PathVariable String id) {
+		return repo.deleteById(id);
 	}
 }
 
-interface CoffeeRepository extends CrudRepository<Coffee, String> {
+interface CoffeeRepository extends ReactiveCrudRepository<Coffee, String> {
 }
 
 @Document
