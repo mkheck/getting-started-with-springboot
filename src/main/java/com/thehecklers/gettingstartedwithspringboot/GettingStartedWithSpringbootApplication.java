@@ -1,5 +1,7 @@
 package com.thehecklers.gettingstartedwithspringboot;
 
+import java.time.Duration;
+
 import javax.annotation.PostConstruct;
 
 import org.springframework.boot.SpringApplication;
@@ -8,6 +10,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -87,6 +90,19 @@ class CoffeeController {
 	@DeleteMapping("/{id}")
 	Mono<Void> deleteCoffeeById(@PathVariable String id) {
 		return repo.deleteById(id);
+	}
+}
+
+@AllArgsConstructor
+@RestController
+@RequestMapping("/coffeestream")
+class StreamController {
+	private final CoffeeRepository repo;
+
+	@GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	Flux<Coffee> getCoffeeStream() {
+		return repo.findAll()
+			.delayElements(Duration.ofSeconds(1));
 	}
 }
 
